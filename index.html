@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>坦克大战 - 终极路径逃逸与安全出生版</title>
+    <title>坦克大战 - 完美对齐与火力抵消版</title>
     <style>
         * {
             user-select: none;
@@ -146,6 +146,7 @@
         <div id="gameOverOverlay">
             <h2 style="color:#ff0000; font-size:32px; margin-bottom:20px;">MISSION FAILED</h2>
             <p style="color:#fff; margin-bottom:20px;">LEVEL ATTAINED: <span id="finalLvl" style="color:#f1c40f">1</span></p>
+            <p style="color:#fff; margin-bottom:30px;">FINAL SCORE: <span id="finalScore" style="color:#f1c40f">0</span></p>
             <button class="btn-retro" id="finalRestartBtn">REBOOT SYSTEM</button>
         </div>
 
@@ -167,7 +168,7 @@
         <div class="footer-controls">
             <button class="btn-retro" id="manualResetBtn">SYSTEM PURGE</button>
         </div>
-        <div class="control-note">INTEL-AI V4 | PURE-EMPTY SPAWN ENGINE</div>
+        <div class="control-note">GRID MAGNETIC ALIGN | BULLET CANCELLATION ENGINE</div>
     </div>
 
 <script>
@@ -185,7 +186,7 @@
         let enemies = [], bullets = [], particles = [], items = [];
         let player = null, joystickActive = false, joystickDir = { x: 0, y: 0 };
         let playerShootCooldown = 0, itemSpawnTimer = 400;
-        let enemiesToSpawn = 0; // 当前关卡剩余待生成的敌人
+        let enemiesToSpawn = 0;
 
         const sprites = {};
         const ITEM_TYPES = { STAR5: 'star5', STAR4: 'star4', HELMET: 'helmet', AMMO: 'ammo' };
@@ -225,13 +226,13 @@
                 o.connect(g); g.connect(this.ctx.destination);
                 o.start(); o.stop(this.ctx.currentTime + dur);
             }
-            shoot() { this.playTone(900, 'triangle', 0.1, 0.04); }
+            shoot() { this.playTone(900, 'triangle', 0.08, 0.04); }
             hit() { this.playTone(100, 'sawtooth', 0.25, 0.1); }
             powerup() { this.playTone(600, 'sine', 0.2, 0.1); this.playTone(900, 'sine', 0.2, 0.1); }
         }
         const audio = new AudioManager();
 
-        // --- 1. 资源绘制引擎 ---
+        // --- 1. 资源绘制 ---
         function initSprites(){
             const d = (fn) => {
                 const c = document.createElement('canvas');
@@ -253,7 +254,7 @@
             });
             sprites.stone_hit = d(g=>{
                 g.fillStyle='#444'; g.fillRect(0,0,40,40);
-                g.strokeStyle='#222'; g.lineWidth=3; g.beginPath(); g.moveTo(0,0); g.lineTo(40,40); g.stroke();
+                g.strokeStyle='#222'; g.lineWidth=3; g.beginPath(); g.moveTo(0,0); g.lineTo(40,40); g.moveTo(40,0); g.lineTo(0,40); g.stroke();
             });
             sprites.water = d(g=>{
                 g.fillStyle='#2980b9'; g.fillRect(0,0,40,40);
@@ -294,10 +295,17 @@
             }
         }
 
-        // --- 2. 强化后的空位探测与生成逻辑 ---
+        // --- 核心：网格磁吸对齐算法 ---
+        // 让坦克的坐标自动平滑吸附到 40 像素的轨道上，完美解决转弯卡墙。
+        function getAlignedPos(val, speed) {
+            // 40 为网格大小，2 是偏移量 (40-36)/2，让 36px 坦克正好居中在 40px 格子里
+            let target = Math.round((val - 2) / 40) * 40 + 2;
+            if(Math.abs(val - target) <= speed) return target;
+            return val < target ? val + speed : val - speed;
+        }
+
         function findTrueEmptySpace(preferBottom = false) {
             let possiblePoints = [];
-            // 扫描地图，寻找 2x2 网格的全空区域
             for(let i=1; i<MAP_H-2; i++) {
                 for(let j=1; j<MAP_W-2; j++) {
                     let isFree = true;
@@ -308,9 +316,7 @@
                         if(!isFree) break;
                     }
                     if(isFree) {
-                        // 检查是否已有坦克占领
-                        let worldX = j * T_SIZE + 2;
-                        let worldY = i * T_SIZE + 2;
+                        let worldX = j * T_SIZE + 2; let worldY = i * T_SIZE + 2;
                         let occupied = false;
                         [player, ...enemies].forEach(t => {
                             if(t && t.alive && Math.abs(t.x - worldX) < 40 && Math.abs(t.y - worldY) < 40) occupied = true;
@@ -319,23 +325,14 @@
                     }
                 }
             }
-
             if(possiblePoints.length === 0) return null;
-
-            // 倾向性逻辑：玩家倾向底部，敌军倾向顶部
-            if(preferBottom) {
-                possiblePoints.sort((a,b) => b.y - a.y);
-            } else {
-                possiblePoints.sort((a,b) => a.y - b.y);
-            }
-
-            // 从最符合条件的前5个点里随机选一个
+            if(preferBottom) possiblePoints.sort((a,b) => b.y - a.y);
+            else possiblePoints.sort((a,b) => a.y - b.y);
             let pool = possiblePoints.slice(0, 5);
             return pool[Math.floor(Math.random() * pool.length)];
         }
 
         function initLevel() {
-            // 地图初始化
             for(let i=0; i<MAP_H; i++) for(let j=0; j<MAP_W; j++) {
                 if(i===0||i===MAP_H-1||j===0||j===MAP_W-1) { mapGrid[i][j]=2; mapHealth[i][j]=9999; }
                 else {
@@ -346,18 +343,14 @@
                     else mapGrid[i][j]=0;
                 }
             }
+            enemies = []; bullets = []; items = [];
+            enemiesToSpawn = 10;
             
-            enemies = [];
-            bullets = []; items = [];
-            enemiesToSpawn = 10; // 固定每局10个敌人
-            
-            // 初始玩家生成
             let pPos = findTrueEmptySpace(true);
             if(pPos) {
                 if(!player) player = new Tank(pPos.x, pPos.y, '#4caf50', '#2d5a1e', true);
                 else { player.x = pPos.x; player.y = pPos.y; player.alive = true; }
             }
-            
             document.getElementById('levelValue').innerText = level;
         }
 
@@ -382,7 +375,7 @@
         }
 
         function triggerExp(x, y, big=false) {
-            audio.hit();
+            if(big) audio.hit();
             for(let i=0; i<(big?35:12); i++) {
                 particles.push({
                     x: x+18, y:y+18, vx:(Math.random()-0.5)*12, vy:(Math.random()-0.5)*12,
@@ -397,13 +390,9 @@
                 return;
             }
 
-            // 分批次生成敌人逻辑
             if(enemiesToSpawn > 0 && enemies.length < 4 && Math.random() < 0.02) {
                 let ePos = findTrueEmptySpace(false);
-                if(ePos) {
-                    enemies.push(new Tank(ePos.x, ePos.y, '#7f8c8d','#ecf0f1'));
-                    enemiesToSpawn--;
-                }
+                if(ePos) { enemies.push(new Tank(ePos.x, ePos.y, '#7f8c8d','#ecf0f1')); enemiesToSpawn--; }
             }
 
             if(respawnTimer > 0) {
@@ -411,7 +400,7 @@
                 if(respawnTimer === 1) { 
                     let safe = findTrueEmptySpace(true);
                     if(safe) { player.x=safe.x; player.y=safe.y; player.alive=true; player.shieldTime=120; }
-                    else respawnTimer = 2; // 继续等待空位
+                    else respawnTimer = 2;
                 }
                 return;
             }
@@ -424,18 +413,27 @@
                 itemSpawnTimer = 350 + Math.random()*300;
             }
 
+            // --- 玩家逻辑 (带磁吸对齐) ---
             if(player && player.alive) {
                 if(player.shieldTime > 0) player.shieldTime--;
                 if(playerShootCooldown > 0) playerShootCooldown--;
                 if(joystickActive) {
                     audio.init();
                     let dx=0, dy=0, nd=player.dir;
+                    let px = player.x, py = player.y;
+
                     if(Math.abs(joystickDir.x) > Math.abs(joystickDir.y)) {
                         dx = joystickDir.x > 0 ? player.speed : -player.speed; nd = joystickDir.x > 0 ? 3 : 2;
+                        py = getAlignedPos(py, player.speed); // 左右走时，Y轴自动对齐轨道
                     } else {
                         dy = joystickDir.y > 0 ? player.speed : -player.speed; nd = joystickDir.y > 0 ? 1 : 0;
+                        px = getAlignedPos(px, player.speed); // 上下走时，X轴自动对齐轨道
                     }
-                    if(!checkCollision(player, dx, dy)) { player.x += dx; player.y += dy; }
+                    
+                    let cDx = px - player.x + dx;
+                    let cDy = py - player.y + dy;
+
+                    if(!checkCollision(player, cDx, cDy)) { player.x = px + dx; player.y = py + dy; }
                     player.dir = nd;
                 }
             }
@@ -453,11 +451,12 @@
                 return it.t > 0;
             });
 
-            // --- AI 逻辑：增强路径逃逸与网格自适应 ---
+            // --- 敌人逻辑 (带磁吸对齐) ---
             enemies.forEach(en => {
                 let edx=0, edy=0;
+                let ex = en.x, ey = en.y;
+
                 if(en.moveTimer <= 0) {
-                    // 决策：追踪或巡逻
                     if(Math.random() < 0.6) {
                         if(Math.abs(player.x - en.x) > Math.abs(player.y - en.y)) en.dir = player.x > en.x ? 3 : 2;
                         else en.dir = player.y > en.y ? 1 : 0;
@@ -466,21 +465,19 @@
                 }
                 en.moveTimer--;
 
-                // 计算位移
-                if(en.dir===0)edy=-E_SPD; else if(en.dir===1)edy=E_SPD; else if(en.dir===2)edx=-E_SPD; else edx=E_SPD;
+                if(en.dir===0) { edy=-E_SPD; ex = getAlignedPos(ex, en.speed); }
+                else if(en.dir===1) { edy=E_SPD; ex = getAlignedPos(ex, en.speed); }
+                else if(en.dir===2) { edx=-E_SPD; ey = getAlignedPos(ey, en.speed); }
+                else { edx=E_SPD; ey = getAlignedPos(ey, en.speed); }
                 
-                if(!checkCollision(en, edx, edy)) { 
-                    en.x+=edx; en.y+=edy; 
-                    en.stuckCounter = 0; 
+                let cDx = ex - en.x + edx, cDy = ey - en.y + edy;
+
+                if(!checkCollision(en, cDx, cDy)) { 
+                    en.x = ex + edx; en.y = ey + edy; en.stuckCounter = 0; 
                 } else { 
                     en.stuckCounter++;
-                    // 核心改进：当卡住时，不仅改变方向，还尝试“垂直逃逸”
                     if (en.stuckCounter > 2) {
-                        // 如果在上下走时撞墙，强制切换到水平轴，反之亦然
                         en.dir = (en.dir === 0 || en.dir === 1) ? (Math.random() < 0.5 ? 2 : 3) : (Math.random() < 0.5 ? 0 : 1);
-                        // 网格自动对齐对齐补丁（防止卡在缝隙边缘）
-                        en.x = Math.round(en.x / 40) * 40;
-                        en.y = Math.round(en.y / 40) * 40;
                     } else {
                         en.dir = Math.floor(Math.random()*4);
                     }
@@ -495,7 +492,24 @@
                 if(en.cooldown > 0) en.cooldown--;
             });
 
-            // 子弹处理
+            // --- 子弹抵消引擎 ---
+            for(let i=0; i<bullets.length; i++) {
+                if(!bullets[i].alive) continue;
+                for(let j=i+1; j<bullets.length; j++) {
+                    if(!bullets[j].alive) continue;
+                    // 如果归属不同（敌方vs玩家），且距离够近，则相互抵消
+                    if(bullets[i].ownerType !== bullets[j].ownerType) {
+                        if(Math.abs(bullets[i].x - bullets[j].x) < 8 && Math.abs(bullets[i].y - bullets[j].y) < 8) {
+                            bullets[i].alive = false;
+                            bullets[j].alive = false;
+                            triggerExp(bullets[i].x-15, bullets[i].y-15, false); // 空中爆出火花
+                        }
+                    }
+                }
+            }
+            bullets = bullets.filter(b => b.alive);
+
+            // --- 剩余子弹逻辑 ---
             for(let i=bullets.length-1; i>=0; i--) {
                 let b = bullets[i]; b.update();
                 let gx = Math.floor((b.x+3)/40), gy = Math.floor((b.y+3)/40);
@@ -514,7 +528,12 @@
                     if(Math.abs(b.x - (player.x+18)) < 20 && Math.abs(b.y - (player.y+18)) < 20) {
                         playerLives--; triggerExp(player.x, player.y, true);
                         player.alive = false; bullets.splice(i,1);
-                        if(playerLives <= 0) { gameRunning = false; document.getElementById('gameOverOverlay').style.display='flex'; }
+                        if(playerLives <= 0) {
+                            gameRunning = false;
+                            document.getElementById('finalLvl').innerText = level;
+                            document.getElementById('finalScore').innerText = score;
+                            document.getElementById('gameOverOverlay').style.display='flex';
+                        }
                         else respawnTimer = 60;
                     }
                 }
@@ -528,7 +547,7 @@
             document.getElementById('livesValue').innerText = playerLives;
         }
 
-        // --- 3. 渲染系统 ---
+        // --- 绘制系统 ---
         function drawTank(t, isP) {
             ctx.save(); ctx.translate(t.x+18, t.y+18);
             ctx.rotate([0, Math.PI, -Math.PI/2, Math.PI/2][t.dir]);
@@ -586,8 +605,9 @@
             }
         });
 
-        document.getElementById('manualResetBtn').onclick = () => location.reload();
-        document.getElementById('finalRestartBtn').onclick = () => location.reload();
+        const systemReset = () => { window.location.reload(); };
+        document.getElementById('manualResetBtn').onclick = systemReset;
+        document.getElementById('finalRestartBtn').onclick = systemReset;
 
         initSprites(); initLevel();
         (function loop() { update(); render(); requestAnimationFrame(loop); })();
