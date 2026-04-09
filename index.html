@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>坦克大战 - 完美对齐与火力抵消版</title>
+    <title>坦克大战 - 气泡UI与十字键重构版</title>
     <style>
         * {
             user-select: none;
@@ -13,162 +13,201 @@
         }
 
         body {
-            background: #000;
+            /* 契合参考图的梦幻天空紫粉渐变 */
+            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Courier New', 'Press Start 2P', monospace;
+            /* 粗黑体字形，饱满有力 */
+            font-family: 'Arial Black', 'Heiti SC', 'Microsoft YaHei', sans-serif;
             margin: 0;
             padding: 8px;
             overflow: hidden;
         }
 
         .game-container {
-            background: #111;
-            border-radius: 12px;
-            padding: 10px;
-            box-shadow: 0 0 100px rgba(0,0,0,1);
+            /* 毛玻璃半透明质感面板 */
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2), inset 0 0 0 3px rgba(255,255,255,0.5);
             display: flex;
             flex-direction: column;
             align-items: center;
             width: 100%;
             max-width: 520px;
             position: relative;
-            border: 3px solid #444;
         }
 
+        /* 气泡风格弹窗 */
         #gameOverOverlay {
             display: none;
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
             z-index: 5000;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            border-radius: 10px;
+            border-radius: 20px;
+            border: 4px solid #fff;
         }
+        #gameOverOverlay h2 { color: #ff5252; font-size: 38px; margin-bottom: 15px; text-shadow: 0 4px 0 #c62828, 0 8px 15px rgba(0,0,0,0.3); text-align: center; line-height: 1.2; }
+        .popup-text { color: #0288d1; font-size: 18px; margin-bottom: 25px; font-weight: bold; text-shadow: 1px 1px 0 #fff; }
 
         canvas {
             display: block;
             margin: 0 auto;
-            border-radius: 4px;
-            box-shadow: 0 0 0 8px #222;
+            border-radius: 8px;
+            box-shadow: 0 0 0 4px #fff, 0 10px 20px rgba(0,0,0,0.3);
             background-color: #000;
             image-rendering: pixelated;
             max-width: 100%;
             height: auto;
+            border: 4px solid #555;
         }
 
+        /* 状态栏：圆润气泡风格 */
         .info-panel {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: #1a1a1a;
+            background: transparent;
             color: #fff;
-            padding: 10px 20px;
+            padding: 5px 0;
             margin-bottom: 12px;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 0.8rem;
             width: 100%;
-            border: 2px solid #555;
+            gap: 8px;
         }
 
-        .stat-box { color: #f1c40f; text-shadow: 1px 1px #000; }
+        .stat-box { 
+            background: linear-gradient(to bottom, #4fc3f7, #0288d1);
+            padding: 8px 15px; 
+            border-radius: 30px; 
+            border: 3px solid #fff;
+            box-shadow: 0 5px 0 #01579b, 0 8px 10px rgba(0,0,0,0.2);
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+            flex: 1;
+            text-align: center;
+            font-size: 14px;
+        }
 
         .touch-controls {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 15px;
-            gap: 10px;
+            margin-top: 25px;
+            margin-bottom: 5px;
             width: 100%;
+            padding: 0 20px;
         }
 
-        .joystick-area {
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: 50%;
-            width: 135px;
-            height: 135px;
+        /* ----- 十字方向键 (D-Pad) 重构 ----- */
+        .dpad-container {
             position: relative;
-            border: 4px solid #444;
+            width: 130px;
+            height: 130px;
         }
-
-        .joystick-thumb {
-            width: 60px;
-            height: 60px;
-            background: radial-gradient(circle at 30% 30%, #aaa, #333);
-            border-radius: 50%;
+        .d-btn {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 8px 16px rgba(0,0,0,1);
+            background: linear-gradient(to bottom, #4dd0e1, #0288d1);
+            border: 3px solid #fff;
+            box-shadow: 0 5px 0 #01579b;
+            border-radius: 8px;
+            transition: filter 0.05s;
         }
+        .d-up { top: 0; left: 42.5px; width: 45px; height: 45px; border-radius: 12px 12px 4px 4px; }
+        .d-down { bottom: 0; left: 42.5px; width: 45px; height: 45px; border-radius: 4px 4px 12px 12px; }
+        .d-left { top: 42.5px; left: 0; width: 45px; height: 45px; border-radius: 12px 4px 4px 12px; }
+        .d-right { top: 42.5px; right: 0; width: 45px; height: 45px; border-radius: 4px 12px 12px 4px; }
+        .d-center { position: absolute; top: 42.5px; left: 42.5px; width: 45px; height: 45px; background: #0288d1; z-index: -1; }
 
+        /* 发射按钮：Q弹红色气泡 */
         .fire-btn {
-            background: radial-gradient(circle at 30% 30%, #ff1a1a, #4d0000);
+            background: linear-gradient(to bottom, #ff5252, #c62828);
             width: 110px;
             height: 110px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 26px;
+            font-size: 28px;
             font-weight: bold;
             color: #fff;
-            box-shadow: 0 8px 0 #220000;
-            border: 5px solid #ff9999;
+            box-shadow: 0 8px 0 #8e0000, 0 12px 15px rgba(0,0,0,0.3);
+            border: 4px solid #fff;
             cursor: pointer;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
         }
+        .fire-btn:active { transform: translateY(5px); box-shadow: 0 3px 0 #8e0000, 0 5px 10px rgba(0,0,0,0.3); }
 
+        .footer-controls { margin-top: 25px; display: flex; justify-content: center; width: 100%; }
+        
+        /* 参考图中的绿色 EASY 按钮风格 */
         .btn-retro {
-            background: #333;
-            color: #f1c40f;
-            padding: 15px 35px;
-            border: 2px solid #f1c40f;
+            background: linear-gradient(to bottom, #69f0ae, #2e7d32);
+            color: #fff;
+            padding: 15px 40px;
+            border: 4px solid #fff;
+            border-radius: 40px;
             font-weight: bold;
+            font-size: 18px;
             cursor: pointer;
             font-family: inherit;
-            box-shadow: 5px 5px 0 #000;
+            box-shadow: 0 6px 0 #1b5e20, 0 10px 15px rgba(0,0,0,0.2);
             text-transform: uppercase;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
         }
-        .btn-retro:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; }
+        .btn-retro:active { transform: translateY(4px); box-shadow: 0 2px 0 #1b5e20; }
 
-        .footer-controls { margin-top: 20px; display: flex; gap: 15px; }
-        .control-note { font-size: 9px; color: #555; margin-top: 12px; letter-spacing: 1px; text-align: center; }
+        /* 系统重置：蓝色圆滑小按钮 */
+        .btn-reset {
+            background: linear-gradient(to bottom, #4fc3f7, #0277bd);
+            color: #fff; padding: 10px 30px; border: 3px solid #fff; border-radius: 30px;
+            font-weight: bold; font-size: 14px; cursor: pointer; font-family: inherit;
+            box-shadow: 0 5px 0 #01579b; text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+        }
+        .btn-reset:active { transform: translateY(3px); box-shadow: 0 2px 0 #01579b; }
+
+        .control-note { font-size: 10px; color: #fff; margin-top: 15px; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); text-align: center; }
     </style>
 </head>
 <body>
     <div class="game-container">
         <div id="gameOverOverlay">
-            <h2 style="color:#ff0000; font-size:32px; margin-bottom:20px;">MISSION FAILED</h2>
-            <p style="color:#fff; margin-bottom:20px;">LEVEL ATTAINED: <span id="finalLvl" style="color:#f1c40f">1</span></p>
-            <p style="color:#fff; margin-bottom:30px;">FINAL SCORE: <span id="finalScore" style="color:#f1c40f">0</span></p>
-            <button class="btn-retro" id="finalRestartBtn">REBOOT SYSTEM</button>
+            <h2 id="endTitle">MISSION<br>FAILED</h2>
+            <div class="popup-text">LEVEL: <span id="finalLvl" style="color:#ff5252">1</span></div>
+            <div class="popup-text">SCORE: <span id="finalScore" style="color:#ff5252">0</span></div>
+            <button class="btn-retro" id="finalRestartBtn">PLAY AGAIN</button>
         </div>
 
         <div class="info-panel">
-            <div>LVL: <span id="levelValue" class="stat-box">1</span></div>
-            <div>SCORE: <span id="scoreValue" class="stat-box">0</span></div>
-            <div>LIFE: <span id="livesValue" class="stat-box">3</span></div>
+            <div class="stat-box">LVL <span id="levelValue" style="color:#ffeb3b">1</span></div>
+            <div class="stat-box">SCORE <span id="scoreValue" style="color:#ffeb3b">0</span></div>
+            <div class="stat-box">LIFE <span id="livesValue" style="color:#ffeb3b">3</span></div>
         </div>
 
         <canvas id="gameCanvas" width="520" height="520"></canvas>
 
         <div class="touch-controls">
-            <div class="joystick-area" id="joystickZone">
-                <div class="joystick-thumb" id="joystickThumb"></div>
+            <div class="dpad-container" id="dpadZone">
+                <div class="d-btn d-up" id="dUp"></div>
+                <div class="d-btn d-down" id="dDown"></div>
+                <div class="d-btn d-left" id="dLeft"></div>
+                <div class="d-btn d-right" id="dRight"></div>
+                <div class="d-center"></div>
             </div>
             <div class="fire-btn" id="fireButton">FIRE</div>
         </div>
 
         <div class="footer-controls">
-            <button class="btn-retro" id="manualResetBtn">SYSTEM PURGE</button>
+            <button class="btn-reset" id="manualResetBtn">RESTART</button>
         </div>
-        <div class="control-note">GRID MAGNETIC ALIGN | BULLET CANCELLATION ENGINE</div>
+        <div class="control-note">BOSS ENEMY APPEARS EVERY LEVEL!</div>
     </div>
 
 <script>
@@ -191,19 +230,14 @@
         const sprites = {};
         const ITEM_TYPES = { STAR5: 'star5', STAR4: 'star4', HELMET: 'helmet', AMMO: 'ammo' };
 
-        // --- 8-BIT 音频管理 ---
+        // --- 音频管理 ---
         class AudioManager {
             constructor() {
-                this.ctx = null;
-                this.initialized = false;
-                this.melody = [261, 329, 392, 523, 392, 329, 261, 196];
-                this.mIdx = 0;
+                this.ctx = null; this.initialized = false;
+                this.melody = [261, 329, 392, 523, 392, 329, 261, 196]; this.mIdx = 0;
             }
             init() {
-                if (this.initialized) {
-                    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-                    return;
-                }
+                if (this.initialized) { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); return; }
                 try {
                     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
                     this.initialized = true;
@@ -218,13 +252,11 @@
             }
             playTone(freq, type, dur, vol) {
                 if (!this.initialized || !this.ctx) return;
-                const o = this.ctx.createOscillator();
-                const g = this.ctx.createGain();
+                const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
                 o.type = type; o.frequency.setValueAtTime(freq, this.ctx.currentTime);
                 g.gain.setValueAtTime(vol, this.ctx.currentTime);
                 g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
-                o.connect(g); g.connect(this.ctx.destination);
-                o.start(); o.stop(this.ctx.currentTime + dur);
+                o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + dur);
             }
             shoot() { this.playTone(900, 'triangle', 0.08, 0.04); }
             hit() { this.playTone(100, 'sawtooth', 0.25, 0.1); }
@@ -234,32 +266,21 @@
 
         // --- 1. 资源绘制 ---
         function initSprites(){
-            const d = (fn) => {
-                const c = document.createElement('canvas');
-                c.width = c.height = T_SIZE;
-                fn(c.getContext('2d'));
-                return c;
-            };
+            const d = (fn) => { const c = document.createElement('canvas'); c.width = c.height = T_SIZE; fn(c.getContext('2d')); return c; };
             sprites.brick = d(g=>{
-                g.fillStyle='#a52a2a'; g.fillRect(0,0,40,40);
-                g.fillStyle='#000'; g.fillRect(0,18,40,4); g.fillRect(18,0,4,40);
+                g.fillStyle='#a52a2a'; g.fillRect(0,0,40,40); g.fillStyle='#000'; g.fillRect(0,18,40,4); g.fillRect(18,0,4,40);
                 g.fillStyle='#cc4e4e'; g.fillRect(2,2,14,14); g.fillRect(22,2,16,14);
             });
             sprites.stone = d(g=>{
-                g.fillStyle='#7f8c8d'; g.fillRect(0,0,40,40);
-                g.fillStyle='#bdc3c7'; g.fillRect(0,0,40,4); g.fillRect(0,0,4,40);
+                g.fillStyle='#7f8c8d'; g.fillRect(0,0,40,40); g.fillStyle='#bdc3c7'; g.fillRect(0,0,40,4); g.fillRect(0,0,4,40);
                 g.fillStyle='#2c3e50'; g.fillRect(0,36,40,4); g.fillRect(36,0,4,40);
-                g.fillStyle='#95a5a6'; g.fillRect(10,10,20,20);
-                g.fillStyle='#bdc3c7'; g.fillRect(12,12,4,4);
+                g.fillStyle='#95a5a6'; g.fillRect(10,10,20,20); g.fillStyle='#bdc3c7'; g.fillRect(12,12,4,4);
             });
             sprites.stone_hit = d(g=>{
-                g.fillStyle='#444'; g.fillRect(0,0,40,40);
-                g.strokeStyle='#222'; g.lineWidth=3; g.beginPath(); g.moveTo(0,0); g.lineTo(40,40); g.moveTo(40,0); g.lineTo(0,40); g.stroke();
+                g.fillStyle='#444'; g.fillRect(0,0,40,40); g.strokeStyle='#222'; g.lineWidth=3; g.beginPath(); g.moveTo(0,0); g.lineTo(40,40); g.moveTo(40,0); g.lineTo(0,40); g.stroke();
             });
             sprites.water = d(g=>{
-                g.fillStyle='#2980b9'; g.fillRect(0,0,40,40);
-                g.fillStyle='#fff'; g.globalAlpha=0.3;
-                for(let i=0; i<4; i++) g.fillRect(5, 5+i*10, 30, 2);
+                g.fillStyle='#2980b9'; g.fillRect(0,0,40,40); g.fillStyle='#fff'; g.globalAlpha=0.3; for(let i=0; i<4; i++) g.fillRect(5, 5+i*10, 30, 2);
             });
             sprites.star5 = d(g=>{ g.fillStyle='#f1c40f'; g.beginPath(); for(let i=0;i<5;i++){ g.lineTo(Math.cos((18+i*72)/180*Math.PI)*15+20,Math.sin((18+i*72)/180*Math.PI)*15+20); g.lineTo(Math.cos((54+i*72)/180*Math.PI)*7+20,Math.sin((54+i*72)/180*Math.PI)*7+20);} g.fill();});
             sprites.star4 = d(g=>{ g.fillStyle='#fff'; g.beginPath(); for(let i=0;i<4;i++){ g.lineTo(Math.cos((i*90)/180*Math.PI)*18+20,Math.sin((i*90)/180*Math.PI)*18+20); g.lineTo(Math.cos((45+i*90)/180*Math.PI)*5+20,Math.sin((45+i*90)/180*Math.PI)*5+20);} g.fill();});
@@ -268,15 +289,17 @@
         }
 
         class Tank {
-            constructor(x, y, colorB, colorT, isP=false) {
+            constructor(x, y, colorB, colorT, isP=false, type='enemy') {
                 this.x=x; this.y=y; this.dir=1;
                 this.alive=true; this.cooldown=0;
                 this.isP=isP; this.colorB=colorB; this.colorT=colorT;
+                this.type = type; // 'player', 'enemy', 'boss'
+                this.hp = (type === 'boss') ? 3 : 1; // Boss 有3点血
                 this.size=TK_SIZE; this.bulletLimit=1; this.shootDelay=25;
-                this.shieldTime=0; this.speed=isP?P_SPD:E_SPD; this.bulletSpeed=B_SPD;
-                this.id = Math.random();
-                this.moveTimer = 0;
-                this.stuckCounter = 0;
+                this.shieldTime=0; 
+                this.speed = isP ? P_SPD : (type === 'boss' ? E_SPD * 0.8 : E_SPD); // Boss稍微慢点
+                this.bulletSpeed=B_SPD;
+                this.id = Math.random(); this.moveTimer = 0; this.stuckCounter = 0;
             }
             getRect() { return { x:this.x, y:this.y, w:this.size, h:this.size }; }
         }
@@ -295,10 +318,8 @@
             }
         }
 
-        // --- 核心：网格磁吸对齐算法 ---
-        // 让坦克的坐标自动平滑吸附到 40 像素的轨道上，完美解决转弯卡墙。
+        // --- 网格磁吸对齐 ---
         function getAlignedPos(val, speed) {
-            // 40 为网格大小，2 是偏移量 (40-36)/2，让 36px 坦克正好居中在 40px 格子里
             let target = Math.round((val - 2) / 40) * 40 + 2;
             if(Math.abs(val - target) <= speed) return target;
             return val < target ? val + speed : val - speed;
@@ -310,9 +331,7 @@
                 for(let j=1; j<MAP_W-2; j++) {
                     let isFree = true;
                     for(let r=0; r<2; r++) {
-                        for(let c=0; c<2; c++) {
-                            if(mapGrid[i+r][j+c] !== 0) { isFree = false; break; }
-                        }
+                        for(let c=0; c<2; c++) { if(mapGrid[i+r][j+c] !== 0) { isFree = false; break; } }
                         if(!isFree) break;
                     }
                     if(isFree) {
@@ -326,10 +345,8 @@
                 }
             }
             if(possiblePoints.length === 0) return null;
-            if(preferBottom) possiblePoints.sort((a,b) => b.y - a.y);
-            else possiblePoints.sort((a,b) => a.y - b.y);
-            let pool = possiblePoints.slice(0, 5);
-            return pool[Math.floor(Math.random() * pool.length)];
+            if(preferBottom) possiblePoints.sort((a,b) => b.y - a.y); else possiblePoints.sort((a,b) => a.y - b.y);
+            let pool = possiblePoints.slice(0, 5); return pool[Math.floor(Math.random() * pool.length)];
         }
 
         function initLevel() {
@@ -344,11 +361,12 @@
                 }
             }
             enemies = []; bullets = []; items = [];
-            enemiesToSpawn = 10;
+            let totalSpawn = Math.min(3 + level, 8);
+            enemiesToSpawn = totalSpawn;
             
             let pPos = findTrueEmptySpace(true);
             if(pPos) {
-                if(!player) player = new Tank(pPos.x, pPos.y, '#4caf50', '#2d5a1e', true);
+                if(!player) player = new Tank(pPos.x, pPos.y, '#4caf50', '#2d5a1e', true, 'player');
                 else { player.x = pPos.x; player.y = pPos.y; player.alive = true; }
             }
             document.getElementById('levelValue').innerText = level;
@@ -358,7 +376,6 @@
             let r = { x: tank.x+dx, y: tank.y+dy, w: TK_SIZE, h: TK_SIZE };
             const margin = 2;
             if(r.x < margin || r.y < margin || r.x + r.w > canvas.width - margin || r.y + r.h > canvas.height - margin) return true;
-            
             for(let i=0; i<MAP_H; i++) for(let j=0; j<MAP_W; j++) {
                 if(mapGrid[i][j]>0) {
                     let tr = { x: j*40, y: i*40, w: 40, h: 40 };
@@ -390,9 +407,17 @@
                 return;
             }
 
+            // 敌人生成逻辑 (每关最后一个生成的敌人是 BOSS)
             if(enemiesToSpawn > 0 && enemies.length < 4 && Math.random() < 0.02) {
                 let ePos = findTrueEmptySpace(false);
-                if(ePos) { enemies.push(new Tank(ePos.x, ePos.y, '#7f8c8d','#ecf0f1')); enemiesToSpawn--; }
+                if(ePos) { 
+                    let isBoss = (enemiesToSpawn === 1); // 最后一个生成的是 Boss
+                    let cBody = isBoss ? '#ff3333' : '#7f8c8d';
+                    let cTurret = isBoss ? '#cc0000' : '#ecf0f1';
+                    let eType = isBoss ? 'boss' : 'enemy';
+                    enemies.push(new Tank(ePos.x, ePos.y, cBody, cTurret, false, eType)); 
+                    enemiesToSpawn--; 
+                }
             }
 
             if(respawnTimer > 0) {
@@ -413,7 +438,7 @@
                 itemSpawnTimer = 350 + Math.random()*300;
             }
 
-            // --- 玩家逻辑 (带磁吸对齐) ---
+            // 玩家移动 (网格磁吸)
             if(player && player.alive) {
                 if(player.shieldTime > 0) player.shieldTime--;
                 if(playerShootCooldown > 0) playerShootCooldown--;
@@ -424,15 +449,12 @@
 
                     if(Math.abs(joystickDir.x) > Math.abs(joystickDir.y)) {
                         dx = joystickDir.x > 0 ? player.speed : -player.speed; nd = joystickDir.x > 0 ? 3 : 2;
-                        py = getAlignedPos(py, player.speed); // 左右走时，Y轴自动对齐轨道
+                        py = getAlignedPos(py, player.speed); 
                     } else {
                         dy = joystickDir.y > 0 ? player.speed : -player.speed; nd = joystickDir.y > 0 ? 1 : 0;
-                        px = getAlignedPos(px, player.speed); // 上下走时，X轴自动对齐轨道
+                        px = getAlignedPos(px, player.speed);
                     }
-                    
-                    let cDx = px - player.x + dx;
-                    let cDy = py - player.y + dy;
-
+                    let cDx = px - player.x + dx, cDy = py - player.y + dy;
                     if(!checkCollision(player, cDx, cDy)) { player.x = px + dx; player.y = py + dy; }
                     player.dir = nd;
                 }
@@ -451,10 +473,9 @@
                 return it.t > 0;
             });
 
-            // --- 敌人逻辑 (带磁吸对齐) ---
+            // 敌人AI
             enemies.forEach(en => {
-                let edx=0, edy=0;
-                let ex = en.x, ey = en.y;
+                let edx=0, edy=0, ex=en.x, ey=en.y;
 
                 if(en.moveTimer <= 0) {
                     if(Math.random() < 0.6) {
@@ -465,10 +486,10 @@
                 }
                 en.moveTimer--;
 
-                if(en.dir===0) { edy=-E_SPD; ex = getAlignedPos(ex, en.speed); }
-                else if(en.dir===1) { edy=E_SPD; ex = getAlignedPos(ex, en.speed); }
-                else if(en.dir===2) { edx=-E_SPD; ey = getAlignedPos(ey, en.speed); }
-                else { edx=E_SPD; ey = getAlignedPos(ey, en.speed); }
+                if(en.dir===0) { edy=-en.speed; ex = getAlignedPos(ex, en.speed); }
+                else if(en.dir===1) { edy=en.speed; ex = getAlignedPos(ex, en.speed); }
+                else if(en.dir===2) { edx=-en.speed; ey = getAlignedPos(ey, en.speed); }
+                else { edx=en.speed; ey = getAlignedPos(ey, en.speed); }
                 
                 let cDx = ex - en.x + edx, cDy = ey - en.y + edy;
 
@@ -476,11 +497,8 @@
                     en.x = ex + edx; en.y = ey + edy; en.stuckCounter = 0; 
                 } else { 
                     en.stuckCounter++;
-                    if (en.stuckCounter > 2) {
-                        en.dir = (en.dir === 0 || en.dir === 1) ? (Math.random() < 0.5 ? 2 : 3) : (Math.random() < 0.5 ? 0 : 1);
-                    } else {
-                        en.dir = Math.floor(Math.random()*4);
-                    }
+                    if (en.stuckCounter > 2) en.dir = (en.dir === 0 || en.dir === 1) ? (Math.random() < 0.5 ? 2 : 3) : (Math.random() < 0.5 ? 0 : 1);
+                    else en.dir = Math.floor(Math.random()*4);
                     en.moveTimer = 30; 
                 }
 
@@ -492,24 +510,22 @@
                 if(en.cooldown > 0) en.cooldown--;
             });
 
-            // --- 子弹抵消引擎 ---
+            // 子弹抵消引擎
             for(let i=0; i<bullets.length; i++) {
                 if(!bullets[i].alive) continue;
                 for(let j=i+1; j<bullets.length; j++) {
                     if(!bullets[j].alive) continue;
-                    // 如果归属不同（敌方vs玩家），且距离够近，则相互抵消
                     if(bullets[i].ownerType !== bullets[j].ownerType) {
                         if(Math.abs(bullets[i].x - bullets[j].x) < 8 && Math.abs(bullets[i].y - bullets[j].y) < 8) {
-                            bullets[i].alive = false;
-                            bullets[j].alive = false;
-                            triggerExp(bullets[i].x-15, bullets[i].y-15, false); // 空中爆出火花
+                            bullets[i].alive = false; bullets[j].alive = false;
+                            triggerExp(bullets[i].x-15, bullets[i].y-15, false); 
                         }
                     }
                 }
             }
             bullets = bullets.filter(b => b.alive);
 
-            // --- 剩余子弹逻辑 ---
+            // 子弹与地形/坦克碰撞
             for(let i=bullets.length-1; i>=0; i--) {
                 let b = bullets[i]; b.update();
                 let gx = Math.floor((b.x+3)/40), gy = Math.floor((b.y+3)/40);
@@ -518,12 +534,22 @@
                     mapHealth[gy][gx]--; if(mapHealth[gy][gx]<=0) mapGrid[gy][gx]=0;
                     triggerExp(b.x-20, b.y-20, false); bullets.splice(i,1); continue;
                 }
+                
                 if(b.ownerType==='player') {
+                    let hitReg = false;
                     enemies.forEach(en => {
-                        if(en.alive && Math.abs(b.x - (en.x+18)) < 20 && Math.abs(b.y - (en.y+18)) < 20) {
-                            triggerExp(en.x, en.y, true); en.alive=false; bullets.splice(i,1); score+=100;
+                        if(en.alive && !hitReg && Math.abs(b.x - (en.x+18)) < 20 && Math.abs(b.y - (en.y+18)) < 20) {
+                            hitReg = true;
+                            if (en.type === 'boss') {
+                                en.hp--;
+                                if (en.hp <= 0) { triggerExp(en.x, en.y, true); en.alive=false; score+=500; } 
+                                else { triggerExp(b.x-10, b.y-10, false); audio.hit(); }
+                            } else {
+                                triggerExp(en.x, en.y, true); en.alive=false; score+=100;
+                            }
                         }
                     });
+                    if(hitReg) { bullets.splice(i,1); continue; }
                 } else if(player && player.alive && player.shieldTime<=0) {
                     if(Math.abs(b.x - (player.x+18)) < 20 && Math.abs(b.y - (player.y+18)) < 20) {
                         playerLives--; triggerExp(player.x, player.y, true);
@@ -543,11 +569,12 @@
             if(enemies.length===0 && enemiesToSpawn === 0 && gameRunning) { level++; transitionTimer=60; }
             particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.life--; });
             particles = particles.filter(p=>p.life>0);
+            
             document.getElementById('scoreValue').innerText = score;
             document.getElementById('livesValue').innerText = playerLives;
         }
 
-        // --- 绘制系统 ---
+        // --- 渲染系统 ---
         function drawTank(t, isP) {
             ctx.save(); ctx.translate(t.x+18, t.y+18);
             ctx.rotate([0, Math.PI, -Math.PI/2, Math.PI/2][t.dir]);
@@ -566,7 +593,8 @@
 
         function render() {
             ctx.fillStyle='#000'; ctx.fillRect(0,0,520,520);
-            ctx.strokeStyle='#333'; ctx.lineWidth=4; ctx.strokeRect(2,2,516,516);
+            ctx.strokeStyle='#444'; ctx.lineWidth=4; ctx.strokeRect(2,2,516,516);
+            
             for(let i=0; i<MAP_H; i++) for(let j=0; j<MAP_W; j++) {
                 let t = mapGrid[i][j];
                 if(t===1) ctx.drawImage(sprites.brick, j*40, i*40);
@@ -578,23 +606,50 @@
             enemies.forEach(e => drawTank(e, false));
             particles.forEach(p => { ctx.fillStyle=p.color; ctx.globalAlpha=p.life/50; ctx.fillRect(p.x,p.y,4,4); ctx.globalAlpha=1; });
             ctx.fillStyle='#f1c40f'; bullets.forEach(b => ctx.fillRect(b.x-2, b.y-2, 5, 5));
+            
             if(transitionTimer > 0) {
                 let p = (60-transitionTimer)/60; ctx.fillStyle='#000';
                 for(let i=0; i<13; i++) for(let j=0; j<13; j++) if(Math.random()<p*1.6) ctx.fillRect(j*40, i*40, 40, 40);
             }
         }
 
-        const jZone = document.getElementById('joystickZone'), jThumb = document.getElementById('joystickThumb');
-        const handleJ = (e) => {
-            e.preventDefault(); const t = e.touches[0], r = jZone.getBoundingClientRect();
-            const dx = t.clientX - (r.left + 67), dy = t.clientY - (r.top + 67);
-            const dist = Math.min(45, Math.hypot(dx, dy)); const ang = Math.atan2(dy, dx);
-            jThumb.style.transform = `translate(calc(-50% + ${Math.cos(ang)*dist}px), calc(-50% + ${Math.sin(ang)*dist}px))`;
-            joystickDir = { x: dx/45, y: dy/45 }; joystickActive = dist > 15;
+        // --- 十字键触控系统 (重构) ---
+        const dpadZone = document.getElementById('dpadZone');
+        const dBtns = {
+            U: document.getElementById('dUp'), D: document.getElementById('dDown'),
+            L: document.getElementById('dLeft'), R: document.getElementById('dRight')
+        };
+
+        const handleDpad = (e) => {
+            e.preventDefault();
+            if(e.touches.length === 0) return;
+            const touch = e.touches[0];
+            const rect = dpadZone.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const dx = touch.clientX - cx; const dy = touch.clientY - cy;
+
+            Object.values(dBtns).forEach(btn => btn.style.filter = 'brightness(1)');
+
+            if (Math.abs(dx) < 15 && Math.abs(dy) < 15) { joystickActive = false; return; }
+
+            joystickActive = true;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0) { joystickDir = {x: 1, y: 0}; dBtns.R.style.filter = 'brightness(0.7)'; }
+                else { joystickDir = {x: -1, y: 0}; dBtns.L.style.filter = 'brightness(0.7)'; }
+            } else {
+                if (dy > 0) { joystickDir = {x: 0, y: 1}; dBtns.D.style.filter = 'brightness(0.7)'; }
+                else { joystickDir = {x: 0, y: -1}; dBtns.U.style.filter = 'brightness(0.7)'; }
+            }
             audio.init();
         };
-        jZone.addEventListener('touchstart', handleJ); jZone.addEventListener('touchmove', handleJ);
-        jZone.addEventListener('touchend', () => { joystickActive = false; jThumb.style.transform = 'translate(-50%, -50%)'; });
+
+        dpadZone.addEventListener('touchstart', handleDpad, {passive: false});
+        dpadZone.addEventListener('touchmove', handleDpad, {passive: false});
+        dpadZone.addEventListener('touchend', (e) => {
+            e.preventDefault(); joystickActive = false;
+            Object.values(dBtns).forEach(btn => btn.style.filter = 'brightness(1)');
+        });
 
         document.getElementById('fireButton').addEventListener('touchstart', (e)=>{
             e.preventDefault(); audio.init();
